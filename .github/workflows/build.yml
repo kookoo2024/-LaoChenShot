@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: 编译（MSVC，静态 CRT）
+        shell: cmd
+        run: |
+          mkdir build
+          rc /nologo /fo build\app.res res\app.rc || exit /b 1
+          cl /nologo /utf-8 /O2 /MT /EHsc /std:c++17 /W3 /DUNICODE /D_UNICODE src\main.cpp build\app.res /Fo:build\ /Fe:build\LaoChenShot.exe /link /SUBSYSTEM:WINDOWS /MANIFEST:NO || exit /b 1
+          dumpbin /dependents build\LaoChenShot.exe
+
+      - name: 打包
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist\LaoChenShot | Out-Null
+          Copy-Item build\LaoChenShot.exe, README.md dist\LaoChenShot\
+          Compress-Archive -Path dist\LaoChenShot -DestinationPath dist\LaoChenShot-windows-x64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LaoChenShot-windows-x64
+          path: dist/LaoChenShot/
+
+      - name: 发布版本
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 老陈截图 ${{ github.ref_name }}
+          files: dist/LaoChenShot-windows-x64.zip
+          body: |
+            老陈截图 LaoChenShot —— 纯 Win32 + GDI+ 桌面截图工具，单个 exe，无第三方依赖。
+
+            下载 `LaoChenShot-windows-x64.zip`，解压后双击 `LaoChenShot.exe`，程序驻留托盘，按 `Ctrl+Alt+A` 开始截图。
