@@ -1,0 +1,6 @@
+build/
+out/
+*.obj
+*.res
+*.o
+.vs/
